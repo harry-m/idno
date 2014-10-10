@@ -53,6 +53,9 @@
              */
             function handleSession()
             {
+                session_save_path(site()->config()->session_path);
+                ini_set('session.gc_probability', 1);
+                
                 /*$sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\MongoDbSessionHandler(\Idno\Core\site()->db()->getClient(), [
                     'database'   => 'idnosession',
                     'collection' => 'idnosession'
@@ -360,9 +363,9 @@
              * @param string $id
              * @return true|false
              */
-            function deleteRecord($id)
+            function deleteRecord($id, $collection = 'entities')
             {
-                return $this->database->entities->remove(array("_id" => new \MongoId($id)));
+                return $this->database->$collection->remove(array("_id" => new \MongoId($id)));
             }
 
             /**

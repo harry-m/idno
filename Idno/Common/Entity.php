@@ -19,6 +19,7 @@
 
             // Which collection should this be stored in?
             public $collection = 'entities';
+            static $retrieve_collection = 'entities';
 
             // Store the entity's attributes
             public $attributes = array(
@@ -101,7 +102,7 @@
              */
             static function countFromAll($search = [])
             {
-                return self::countFromX('', $search);
+                return static::countFromX('', $search);
             }
 
             /**
@@ -127,7 +128,7 @@
 
             static function getOne($search = array(), $fields = array())
             {
-                if ($records = self::get($search, $fields, 1))
+                if ($records = static::get($search, $fields, 1))
                     foreach ($records as $record)
                         return $record;
 
@@ -147,7 +148,7 @@
 
             static function get($search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                return \Idno\Core\site()->db()->getObjects(get_called_class(), $search, $fields, $limit, $offset);
+                return \Idno\Core\site()->db()->getObjects(get_called_class(), $search, $fields, $limit, $offset, static::$retrieve_collection);
             }
 
             /**
@@ -159,7 +160,7 @@
             static function getByID($id)
             {
                 try {
-                    return self::getOneFromAll(array('_id' => \Idno\Core\site()->db()->processID($id)));
+                    return static::getOneFromAll(array('_id' => \Idno\Core\site()->db()->processID($id)));
                 } catch (\Exception $e) {
                     return false; //\Idno\Core\site()->currentPage()->noContent();
                 }
@@ -176,7 +177,7 @@
 
             static function getOneFromAll($search = array(), $fields = array())
             {
-                if ($records = self::getFromAll($search, $fields, 1))
+                if ($records = static::getFromAll($search, $fields, 1))
                     foreach ($records as $record)
                         return $record;
 
@@ -195,7 +196,7 @@
              */
             static function getFromAll($search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                $result = self::getFromX('', $search, $fields, $limit, $offset);
+                $result = static::getFromX('', $search, $fields, $limit, $offset);
 
                 return $result;
             }
@@ -213,7 +214,7 @@
              */
             static function getFromX($class, $search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                $result = \Idno\Core\site()->db()->getObjects($class, $search, $fields, $limit, $offset);
+                $result = \Idno\Core\site()->db()->getObjects($class, $search, $fields, $limit, $offset, static::$retrieve_collection);
 
                 return $result;
             }
@@ -236,11 +237,7 @@
 
             static function getByUUID($uuid)
             {
-                //if (self::isLocalUUID($uuid)) {
-                return self::getOneFromAll(array('uuid' => $uuid));
-                //} else {
-                //    return self::getRemote($uuid);
-                //}
+                return static::getOneFromAll(array('uuid' => $uuid));
             }
 
             /**
@@ -612,7 +609,7 @@
                     return false;
                 }
 
-                return self::getOneFromAll(array('slug' => $slug));
+                return static::getOneFromAll(array('slug' => $slug));
             }
 
             /**
@@ -692,15 +689,16 @@
                 if (!empty($this->attachments)) {
                     if (!empty(\Idno\Core\site()->config()->attachment_base_host)) {
                         $attachments = $this->attachments;
-                        foreach($this->attachments as $key => $value) {
+                        foreach ($this->attachments as $key => $value) {
                             if (!empty($value['url'])) {
-                                $host = parse_url($value['url'], PHP_URL_HOST);
-                                $value['url'] = str_replace($host, \Idno\Core\site()->config()->attachment_base_host, $value['url']);
+                                $host              = parse_url($value['url'], PHP_URL_HOST);
+                                $value['url']      = str_replace($host, \Idno\Core\site()->config()->attachment_base_host, $value['url']);
                                 $attachments[$key] = $value;
                             }
                         }
                         $this->attachments = $attachments;
                     }
+
                     return $this->attachments;
                 } else {
                     return [];
@@ -726,7 +724,7 @@
                         }
                     }
 
-                    if ($return = \Idno\Core\db()->deleteRecord($this->getID())) {
+                    if ($return = \Idno\Core\db()->deleteRecord($this->getID(), $this->collection)) {
                         $this->deleteData();
 
                         return $return;
@@ -1015,7 +1013,7 @@
 
                 $seed = rand(0, 99999999);
                 $code = shorten($seed);
-                while ($entity = self::getByShortURL($code)) {
+                while ($entity = static::getByShortURL($code)) {
                     $code = shorten(rand(0, 99999999));
                 }
                 $this->shorturl = $code;
@@ -1036,7 +1034,7 @@
                     return false;
                 }
 
-                return self::getOneFromAll(array('shorturl' => $url));
+                return static::getOneFromAll(array('shorturl' => $url));
             }
 
             /**
@@ -1343,7 +1341,8 @@
              * Returns the URL of this object, or the URL of the contained object if this is a container.
              * @return string
              */
-            function getObjectURL() {
+            function getObjectURL()
+            {
                 return $this->getURL();
             }
 
@@ -1385,20 +1384,20 @@
                                             if (!empty($item['properties']['url'])) $mentions['owner']['url'] = $item['properties']['url'][0];
                                             if (!empty($item['properties']['photo'])) {
                                                 //$mentions['owner']['photo'] = $item['properties']['photo'][0];
-                                                
+
                                                 $tmpfname = tempnam(sys_get_temp_dir(), 'webmention_avatar');
                                                 file_put_contents($tmpfname, \Idno\Core\Webservice::file_get_contents($item['properties']['photo'][0]));
-                                                
+
                                                 $name = md5($item['properties']['url'][0]);
-                                                
+
                                                 // TODO: Don't update the cache image for every webmention
-                                                
+
                                                 if ($icon = \Idno\Entities\File::createThumbnailFromFile($tmpfname, $name, 300)) {
                                                     $mentions['owner']['photo'] = \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
                                                 } else if ($icon = \Idno\Entities\File::createFromFile($tmpfname, $name)) {
                                                     $mentions['owner']['photo'] = \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
                                                 }
-                                                
+
                                                 unlink($tmpfname);
                                             }
                                         }
@@ -1491,9 +1490,9 @@
                                 if ($type == 'h-card') {
                                     if (!empty($author['properties']['name'])) $mentions['owner']['name'] = $author['properties']['name'][0];
                                     if (!empty($author['properties']['url'])) $mentions['owner']['url'] = $author['properties']['url'][0];
-                                    if (!empty($author['properties']['photo'])) { 
+                                    if (!empty($author['properties']['photo'])) {
                                         //$mentions['owner']['photo'] = $author['properties']['photo'][0];
-                                        
+
                                         $tmpfname = tempnam(sys_get_temp_dir(), 'webmention_avatar');
                                         file_put_contents($tmpfname, \Idno\Core\Webservice::file_get_contents($author['properties']['photo'][0]));
 
@@ -1622,7 +1621,7 @@
                     $annotation_url = $this->getURL() . '/annotations/' . md5(time() . $content); // Invent a URL for this annotation
                 }
                 if ($existing_annotations = $this->getAnnotations($subtype)) {
-                    foreach($existing_annotations as $existing_local_url => $existing_annotation) {
+                    foreach ($existing_annotations as $existing_local_url => $existing_annotation) {
                         if ($existing_annotation['permalink'] == $annotation_url) {
                             $local_url = $existing_local_url;
                         }
